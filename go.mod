@@ -6,6 +6,9 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.1-0.20210510153419-66a699ae3b05
 	github.com/onsi/gomega v1.10.3 // indirect
+	github.com/ovn-org/libovsdb v0.6.0
+	gopkg.in/gcfg.v1 v1.2.3
+	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/api v0.21.3
 	k8s.io/apimachinery v0.21.3
 	k8s.io/client-go v0.21.3

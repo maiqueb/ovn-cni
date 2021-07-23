@@ -1,6 +1,9 @@
 package controller
 
 import (
+	v1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	"github.com/maiqueb/ovn-cni/pkg/config"
+	"github.com/maiqueb/ovn-cni/pkg/ovn"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +39,8 @@ type NetworkController struct {
 	workqueue workqueue.RateLimitingInterface
 
 	recorder record.EventRecorder
+
+	ovnClient ovn.NorthClient
 }
 
 // NewNetworkController returns new NetworkController instance
@@ -51,6 +56,16 @@ func NewNetworkController(
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: k8sClientSet.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName})
 
+	ovnConfig, err := config.InitConfigWithPath("/etc/ovn-cni.conf")
+	if err != nil {
+		klog.V(3).Info("failed reading OVN configuration")
+		return nil
+	}
+	ovnClient, err := ovn.NewOVNNBClient(*ovnConfig)
+	if err != nil {
+		klog.V(3).Info("failed creating the OVN north client")
+		return nil
+	}
 	NetworkController := &NetworkController{
 		k8sClientSet:          k8sClientSet,
 		netAttachDefClientSet: netAttachDefClientSet,
@@ -60,6 +75,7 @@ func NewNetworkController(
 			workqueue.DefaultControllerRateLimiter(),
 			"secondary-ovn-networks"),
 		recorder:              recorder,
+		ovnClient:             ovnClient,
 	}
 
 	netAttachDefInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -115,7 +131,19 @@ func (c *NetworkController) handlePodEvent(obj interface{}) {
 }
 
 func (c *NetworkController) handleNetAttachDefAddEvent(obj interface{}) {
+	nad, ok := obj.(*v1.NetworkAttachmentDefinition)
+	if !ok {
+		return
+	}
+	operations, err := c.ovnClient.CreateLogicalSwitch(nad.GetName())
+	if err != nil {
+		klog.Errorf("failed to generate logical switch for network: %s", nad.GetName())
+	}
 
+	if err := c.ovnClient.CommitTransactions(operations); err != nil {
+		klog.Errorf("%w", err)
+		return
+	}
 }
 
 func (c *NetworkController) handleNetAttachDefDeleteEvent(obj interface{}) {
@@ -123,7 +151,6 @@ func (c *NetworkController) handleNetAttachDefDeleteEvent(obj interface{}) {
 }
 
 func (c *NetworkController) handleNewPod(obj interface{}) {
-
 }
 
 func (c *NetworkController) handleDeletePod(obj interface{}) {
