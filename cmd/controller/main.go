@@ -14,12 +14,17 @@ import (
 	clientset "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
 	sharedInformers "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions"
 
+	"github.com/maiqueb/ovn-cni/pkg/config"
 	"github.com/maiqueb/ovn-cni/pkg/controller"
 )
 
 var (
 	master     string
 	kubeconfig string
+	ovnNorth   string
+	ovsBridge  string
+	ovnContainerName string
+	ovsContainerName string
 
 	// defines default resync period between k8s API server and controller
 	syncPeriod = time.Second * 5
@@ -28,18 +33,13 @@ var (
 func main() {
 	flag.StringVar(&master, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Required if out-of-cluster.")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Required if out-of-cluster.")
+	flag.StringVar(&ovnNorth, "ovnaddr", "", "The OVN-NB address. Required.")
+	flag.StringVar(&ovsBridge, "ovsbridge", "br-int", "The OVS bridge to use.")
+	flag.StringVar(&ovnContainerName, "ovncontainer", "ovnkube-node", "The OVN north container. Mandatory with a containerized deployment.")
+	flag.StringVar(&ovsContainerName, "ovscontainer", "ovs-daemons", "The OVS container. Mandatory with a containerized deployment.")
 
+	klog.InitFlags(nil)
 	flag.Parse()
-
-	klogFlags := flag.NewFlagSet("klog", flag.ExitOnError)
-	klog.InitFlags(klogFlags)
-	flag.CommandLine.VisitAll(func(f1 *flag.Flag) {
-		f2 := klogFlags.Lookup(f1.Name)
-		if f2 != nil {
-			value := f1.Value.String()
-			f2.Value.Set(value)
-		}
-	})
 
 	cfg, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
 	if err != nil {
@@ -59,11 +59,15 @@ func main() {
 	netAttachDefInformerFactory := sharedInformers.NewSharedInformerFactory(netAttachDefClientSet, syncPeriod)
 	k8sInformerFactory := informers.NewSharedInformerFactory(k8sClientSet, syncPeriod)
 
-	networkController := controller.NewNetworkController(
+	networkController, err := controller.NewNetworkController(
 		k8sClientSet,
 		k8sInformerFactory.Core().V1().Pods(),
 		netAttachDefClientSet,
-		netAttachDefInformerFactory.K8sCniCncfIo().V1().NetworkAttachmentDefinitions())
+		netAttachDefInformerFactory.K8sCniCncfIo().V1().NetworkAttachmentDefinitions(),
+		newOvnConfig())
+	if err != nil {
+		os.Exit(-1)
+	}
 
 	stopChan := make(chan struct{})
 	c := make(chan os.Signal, 1)
@@ -78,4 +82,13 @@ func main() {
 	netAttachDefInformerFactory.Start(stopChan)
 	k8sInformerFactory.Start(stopChan)
 	networkController.Start(stopChan)
+}
+
+func newOvnConfig() config.OvnConfig {
+	return config.OvnConfig{
+		OvsBridge:    ovsBridge,
+		Address:      ovnNorth,
+		OvnContainer: ovnContainerName,
+		OvsContainer: ovsContainerName,
+	}
 }

@@ -48,7 +48,8 @@ func NewNetworkController(
 	k8sClientSet kubernetes.Interface,
 	podInformer coreinformers.PodInformer,
 	netAttachDefClientSet clientset.Interface,
-	netAttachDefInformer informers.NetworkAttachmentDefinitionInformer) *NetworkController {
+	netAttachDefInformer informers.NetworkAttachmentDefinitionInformer,
+	ovnConfig config.OvnConfig) (*NetworkController, error) {
 
 	klog.V(3).Info("creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
@@ -56,17 +57,12 @@ func NewNetworkController(
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: k8sClientSet.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName})
 
-	ovnConfig, err := config.InitConfigWithPath("/etc/ovn-cni.conf")
+	ovnClient, err := ovn.NewOVNNBClient(ovnConfig)
 	if err != nil {
-		klog.V(3).Info("failed reading OVN configuration")
-		return nil
+		klog.Errorf("failed creating the OVN north client: %v", err)
+		return nil, err
 	}
-	ovnClient, err := ovn.NewOVNNBClient(*ovnConfig)
-	if err != nil {
-		klog.V(3).Info("failed creating the OVN north client")
-		return nil
-	}
-	NetworkController := &NetworkController{
+	networkController := &NetworkController{
 		k8sClientSet:          k8sClientSet,
 		netAttachDefClientSet: netAttachDefClientSet,
 		netAttachDefsSynced:   netAttachDefInformer.Informer().HasSynced,
@@ -79,16 +75,16 @@ func NewNetworkController(
 	}
 
 	netAttachDefInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    NetworkController.handleNetAttachDefAddEvent,
-		DeleteFunc: NetworkController.handleNetAttachDefDeleteEvent,
+		AddFunc:    networkController.handleNetAttachDefAddEvent,
+		DeleteFunc: networkController.handleNetAttachDefDeleteEvent,
 	})
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    NetworkController.handleNewPod,
-		DeleteFunc: NetworkController.handleDeletePod,
+		AddFunc:    networkController.handleNewPod,
+		DeleteFunc: networkController.handleDeletePod,
 	})
 
-	return NetworkController
+	return networkController, nil
 }
 
 func (c *NetworkController) worker() {
@@ -131,13 +127,14 @@ func (c *NetworkController) handlePodEvent(obj interface{}) {
 }
 
 func (c *NetworkController) handleNetAttachDefAddEvent(obj interface{}) {
+	klog.V(4).Infof("add net-attach-def event: %v", obj)
 	nad, ok := obj.(*v1.NetworkAttachmentDefinition)
 	if !ok {
 		return
 	}
 	operations, err := c.ovnClient.CreateLogicalSwitch(nad.GetName())
 	if err != nil {
-		klog.Errorf("failed to generate logical switch for network: %s", nad.GetName())
+		klog.Errorf("failed to generate logical switch for network: %s. Reason: %v", nad.GetName(), err)
 	}
 
 	if err := c.ovnClient.CommitTransactions(operations); err != nil {
@@ -147,7 +144,20 @@ func (c *NetworkController) handleNetAttachDefAddEvent(obj interface{}) {
 }
 
 func (c *NetworkController) handleNetAttachDefDeleteEvent(obj interface{}) {
+	klog.V(4).Infof("remove net-attach-def event: %v", obj)
+	nad, ok := obj.(*v1.NetworkAttachmentDefinition)
+	if !ok {
+		return
+	}
+	operations, err := c.ovnClient.RemoveLogicalSwitch(nad.GetName())
+	if err != nil {
+		klog.Errorf("failed to remove logical switch for network: %s. Reason: %v", nad.GetName(), err)
+	}
 
+	if err := c.ovnClient.CommitTransactions(operations); err != nil {
+		klog.Errorf("%w", err)
+		return
+	}
 }
 
 func (c *NetworkController) handleNewPod(obj interface{}) {

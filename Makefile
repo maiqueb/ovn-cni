@@ -1,7 +1,7 @@
 CNI_MOUNT_PATH ?= /opt/cni/bin
 
 IMAGE_NAME ?= k8s-ovn-cni
-IMAGE_REGISTRY ?= quay.io/maiqueb
+IMAGE_REGISTRY ?= docker.io/maiqueb
 IMAGE_PULL_POLICY ?= Always
 IMAGE_TAG ?= latest
 
@@ -43,6 +43,9 @@ $(GO):
 	hack/install-go.sh $(BIN_DIR)
 
 .ONESHELL:
+
+build-controller: $(GO)
+	$(GO) build -o build/k8s-ovn-controller github.com/maiqueb/ovn-cni/cmd/controller
 
 format:
 	$(GO)fmt -w ./pkg/ ./cmd/
