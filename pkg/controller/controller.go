@@ -34,7 +34,7 @@ type NetworkController struct {
 	netAttachDefClientSet clientset.Interface
 
 	netAttachDefsSynced cache.InformerSynced
-	podsSynced cache.InformerSynced
+	podsSynced          cache.InformerSynced
 
 	workqueue workqueue.RateLimitingInterface
 
@@ -71,20 +71,20 @@ func NewNetworkController(
 		netAttachDefClientSet: netAttachDefClientSet,
 		netAttachDefsSynced:   netAttachDefInformer.Informer().HasSynced,
 		podsSynced:            podInformer.Informer().HasSynced,
-		workqueue:             workqueue.NewNamedRateLimitingQueue(
+		workqueue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(),
 			"secondary-ovn-networks"),
-		recorder:              recorder,
-		ovnClient:             ovnClient,
+		recorder:  recorder,
+		ovnClient: ovnClient,
 	}
 
 	netAttachDefInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: NetworkController.handleNetAttachDefAddEvent,
+		AddFunc:    NetworkController.handleNetAttachDefAddEvent,
 		DeleteFunc: NetworkController.handleNetAttachDefDeleteEvent,
 	})
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: NetworkController.handleNewPod,
+		AddFunc:    NetworkController.handleNewPod,
 		DeleteFunc: NetworkController.handleDeletePod,
 	})
 

@@ -36,11 +36,10 @@ func (nc NorthClient) CreateLogicalSwitch(name string) ([]ovsdb.Operation, error
 
 func (nc NorthClient) CommitTransactions(operations []ovsdb.Operation) error {
 	results, err := nc.client.Transact(operations...)
-	if err != nil{
+	if err != nil {
 		klog.Errorf("failed committing transaction: %w", err)
 		return err
 	}
 	klog.Infof("transaction results: %+v", results)
 	return nil
 }
-
