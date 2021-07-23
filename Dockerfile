@@ -1,0 +1,21 @@
+FROM golang:1.16 as builder
+
+ADD . /usr/src/k8s-ovn-cni
+
+ENV HTTP_PROXY $http_proxy
+ENV HTTPS_PROXY $https_proxy
+
+WORKDIR /usr/src/k8s-ovn-cni
+RUN GOOS=linux\
+ CGO_ENABLED=0\
+   go build -o \
+     /usr/src/k8s-ovn-cni/build/k8s-ovn-controller \
+     github.com/maiqueb/ovn-cni/cmd/controller
+
+FROM registry.access.redhat.com/ubi8/ubi-minimal
+COPY --from=builder /usr/src/k8s-ovn-cni/build/k8s-ovn-controller /usr/bin/
+WORKDIR /
+
+LABEL io.k8s.display-name="OVN-CNI"
+
+ENTRYPOINT ["/usr/bin/k8s-ovn-controller", "--alsologtostderr"]
