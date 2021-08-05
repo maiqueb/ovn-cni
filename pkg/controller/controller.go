@@ -7,6 +7,8 @@ import (
 	"github.com/maiqueb/ovn-cni/pkg/api"
 	"github.com/maiqueb/ovn-cni/pkg/config"
 	"github.com/maiqueb/ovn-cni/pkg/ovn"
+	"github.com/ovn-org/libovsdb/ovsdb"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -84,6 +86,7 @@ func NewNetworkController(
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    networkController.handleNewPod,
+		UpdateFunc: networkController.handleUpdatePod,
 		DeleteFunc: networkController.handleDeletePod,
 	})
 
@@ -176,10 +179,52 @@ func (c *NetworkController) handleNetAttachDefDeleteEvent(obj interface{}) {
 }
 
 func (c *NetworkController) handleNewPod(obj interface{}) {
+	//klog.V(4).Infof("add pod event: %v", obj)
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+
+	podSecondaryNetworks, err := getPodOvnSecondaryNetworks(pod.GetAnnotations())
+	if  err != nil {
+		return
+	}
+	klog.Infof("pod %s has networks: %v", pod.GetName(), podSecondaryNetworks)
+	var operations []ovsdb.Operation
+	for _, networkName := range podSecondaryNetworks {
+		klog.Infof("going to create LSP for pod %s on network %s", pod.GetName(), networkName)
+		createLspOperations, err := c.ovnClient.CreateLogicalSwitchPort(pod.GetName(), networkName)
+		if err != nil {
+			klog.Errorf("failed to create logical switch port for pod: %s. Reason: %v", pod.GetName(), err)
+		}
+		operations = append(operations, createLspOperations...)
+	}
+
+	if err := c.ovnClient.CommitTransactions(operations); err != nil {
+		klog.Errorf("%w", err)
+		return
+	}
+}
+
+func (c *NetworkController) handleUpdatePod(oldObj interface{}, newObj interface{}) {
+	//klog.V(4).Infof("update pod event: oldObj: %v, newObj: %v", oldObj, newObj)
+	_, ok := oldObj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+
+	_, ok = newObj.(*corev1.Pod)
+	if !ok {
+		return
+	}
 }
 
 func (c *NetworkController) handleDeletePod(obj interface{}) {
-
+	//klog.V(4).Infof("remove pod event: %v", obj)
+	_, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
 }
 
 // Start runs worker thread after performing cache synchronization
@@ -210,4 +255,46 @@ func getOvnSecondaryNetworkInfo(nad v1.NetworkAttachmentDefinition) (*api.OvnSec
 		return ovnCniConfig, nil
 	}
 	return nil, fmt.Errorf("not an ovn secondary network")
+}
+
+func getPodOvnSecondaryNetworks(podAnnotations map[string]string) ([]string, error) {
+	networkAnnotationsString, ok := podAnnotations[cncfNetworksKey]
+	if !ok {
+		klog.V(4).Info("skipping pod event: network annotations missing")
+		return nil, fmt.Errorf("no network annotations found on pod: %v", podAnnotations)
+	}
+
+	var secondaryNetworks []string
+	for _, item := range strings.Split(networkAnnotationsString, ",") {
+		// Remove leading and trailing whitespace.
+		item = strings.TrimSpace(item)
+
+		//// Parse network name (i.e. <namespace>/<network name>@<ifname>)
+		//netNsName, networkName, err := parsePodNetworkObjectName(item)
+		//if err != nil {
+		//	return nil, fmt.Errorf("parsePodNetworkAnnotation: %v", err)
+		//}
+		secondaryNetworks = append(secondaryNetworks, item)
+	}
+
+	//var networkSelectionElements []v1.NetworkSelectionElement
+	//if err := json.Unmarshal([]byte(networkAnnotationsString), &networkSelectionElements); err != nil {
+	//	return nil, err
+	//}
+	//
+	//var secondaryNetworks []string
+	//for _, networkSelectionElement := range networkSelectionElements {
+	//	klog.Infof("network selection element: %+v", networkSelectionElement)
+	//	secondaryNetworks = append(secondaryNetworks, networkSelectionElement.Name)
+	//}
+	return secondaryNetworks, nil
+}
+
+func parsePodNetworkObjectName(podNetwork string) (string, string, error) {
+	arr := strings.Split(podNetwork, "/")
+	if len(arr) == 2 {
+		return arr[0], arr[1], nil
+	} else {
+		return "", "", fmt.Errorf("wrong inpuit")
+	}
 }

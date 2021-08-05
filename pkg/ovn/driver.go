@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	logicalSwitchTableName = "Logical_Switch"
+	logicalSwitchTableName        = "Logical_Switch"
+	logicalSwitchPortTableName    = "Logical_Switch_Port"
 	logicalSwitchConfigExcludeIPs = "exclude_ips"
-	logicalSwitchConfigSubnet = "subnet"
-	ovnSecondaryNetsPrefix = "ovn_secondary_"
+	logicalSwitchConfigSubnet     = "subnet"
+	ovnSecondaryNetsPrefix        = "ovn_secondary_"
 )
 
 type NorthClient struct {
@@ -27,6 +28,7 @@ type NorthClient struct {
 func NewOVNNBClient(ovnConfig config.OvnConfig) (NorthClient, error) {
 	dbModel, err := model.NewDBModel("OVN_Northbound", map[string]model.Model{
 		logicalSwitchTableName: &LogicalSwitch{},
+		logicalSwitchPortTableName: &LogicalSwitchPort{},
 	})
 	if err != nil {
 		return NorthClient{}, err
@@ -50,7 +52,7 @@ func (nc NorthClient) CreateLogicalSwitch(name string, networkConfig api.OvnSeco
 	}
 	return nc.client.Create(
 		&LogicalSwitch{
-			Name: ovnSecondaryNetsPrefix + name,
+			Name:   ovnSecondaryNetsPrefix + name,
 			Config: lsConfig,
 		})
 }
@@ -59,6 +61,64 @@ func (nc NorthClient) RemoveLogicalSwitch(name string) ([]ovsdb.Operation, error
 	ls := &LogicalSwitch{}
 	return nc.client.Where(ls, model.Condition{
 		Field:    &ls.Name,
+		Function: ovsdb.ConditionEqual,
+		Value:    ovnSecondaryNetsPrefix + name,
+	}).Delete()
+}
+
+func (nc NorthClient) CreateLogicalSwitchPort(portName string, switchName string) ([]ovsdb.Operation, error) {
+	logicalSwitchPort := &LogicalSwitchPort{
+		Name:      ovnSecondaryNetsPrefix + portName,
+		UUID:      portName,
+		Addresses: []string{"dynamic"},
+	}
+
+	createLogicalSwitchOps, err := nc.client.Create(logicalSwitchPort)
+	if err != nil {
+		return nil, err
+	}
+
+	logicalSwitch := &LogicalSwitch{}
+	updateLogicalSwitchPortsOps, err := nc.client.Where(logicalSwitch,
+		model.Condition{
+			Field:    &logicalSwitch.Name,
+			Function: ovsdb.ConditionEqual,
+			Value:    ovnSecondaryNetsPrefix + switchName,
+		}).Mutate(logicalSwitch,
+		model.Mutation{
+			Field:   &logicalSwitch.Ports,
+			Mutator: ovsdb.MutateOperationInsert,
+			Value:   []string{portName},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	createLogicalSwitchOps = append(createLogicalSwitchOps, updateLogicalSwitchPortsOps...)
+	return createLogicalSwitchOps, nil
+}
+
+func (nc NorthClient) UpdateLogicalSwitchPort(name string, mac string, addresses []string) ([]ovsdb.Operation, error) {
+	lsp := &LogicalSwitchPort{Name: name}
+	if err := nc.client.Get(lsp); err != nil {
+		return nil, err
+	}
+	if len(addresses) == 0 {
+		lsp.Addresses = []string{"dynamic"}
+	} else {
+		lsp.Addresses = append([]string{mac}, addresses...)
+	}
+	return nc.client.Where(lsp, model.Condition{
+		Field:    &lsp.Name,
+		Function: ovsdb.ConditionEqual,
+		Value:    ovnSecondaryNetsPrefix + name,
+	}).Update(lsp)
+}
+
+func (nc NorthClient) DeleteLogicalSwitchPort(name string) ([]ovsdb.Operation, error) {
+	lsp := &LogicalSwitchPort{}
+	return nc.client.Where(lsp, model.Condition{
+		Field:    &lsp.Name,
 		Function: ovsdb.ConditionEqual,
 		Value:    ovnSecondaryNetsPrefix + name,
 	}).Delete()
@@ -86,7 +146,6 @@ func NextIP(ip net.IP) net.IP {
 	i := ipToInt(ip)
 	return intToIP(i.Add(i, big.NewInt(1)))
 }
-
 
 func ipToInt(ip net.IP) *big.Int {
 	if v := ip.To4(); v != nil {
