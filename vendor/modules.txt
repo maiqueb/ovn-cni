@@ -5,6 +5,9 @@ github.com/cenkalti/hub
 # github.com/cenkalti/rpc2 v0.0.0-20210220005819-4a29bc83afe1
 github.com/cenkalti/rpc2
 github.com/cenkalti/rpc2/jsonrpc
+# github.com/containernetworking/cni v0.7.1
+## explicit
+github.com/containernetworking/cni/pkg/types
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/fsnotify/fsnotify v1.4.9
@@ -140,15 +143,10 @@ google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/gcfg.v1 v1.2.3
 ## explicit
-gopkg.in/gcfg.v1
-gopkg.in/gcfg.v1/scanner
-gopkg.in/gcfg.v1/token
-gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
 # gopkg.in/warnings.v0 v0.1.2
 ## explicit
-gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.4.0
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c

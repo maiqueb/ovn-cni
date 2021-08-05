@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"encoding/json"
+	"fmt"
 	v1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	"github.com/maiqueb/ovn-cni/pkg/api"
 	"github.com/maiqueb/ovn-cni/pkg/config"
 	"github.com/maiqueb/ovn-cni/pkg/ovn"
 	"time"
@@ -132,7 +135,13 @@ func (c *NetworkController) handleNetAttachDefAddEvent(obj interface{}) {
 	if !ok {
 		return
 	}
-	operations, err := c.ovnClient.CreateLogicalSwitch(nad.GetName())
+
+	ovnNet, err := getOvnSecondaryNetworkInfo(*nad)
+	if err != nil {
+		return
+	}
+
+	operations, err := c.ovnClient.CreateLogicalSwitch(nad.GetName(), *ovnNet)
 	if err != nil {
 		klog.Errorf("failed to generate logical switch for network: %s. Reason: %v", nad.GetName(), err)
 	}
@@ -149,6 +158,12 @@ func (c *NetworkController) handleNetAttachDefDeleteEvent(obj interface{}) {
 	if !ok {
 		return
 	}
+
+	_, err := getOvnSecondaryNetworkInfo(*nad)
+	if err != nil {
+		return
+	}
+
 	operations, err := c.ovnClient.RemoveLogicalSwitch(nad.GetName())
 	if err != nil {
 		klog.Errorf("failed to remove logical switch for network: %s. Reason: %v", nad.GetName(), err)
@@ -181,4 +196,18 @@ func (c *NetworkController) Start(stopChan <-chan struct{}) {
 	<-stopChan
 	klog.V(4).Infof("shutting down network controller")
 	return
+}
+
+func getOvnSecondaryNetworkInfo(nad v1.NetworkAttachmentDefinition) (*api.OvnSecondaryNetwork, error) {
+	ovnCniConfig := &api.OvnSecondaryNetwork{}
+
+	if err := json.Unmarshal([]byte(nad.Spec.Config), ovnCniConfig); err != nil {
+		klog.Errorf("could not unmarshall net-attach-def data: %v", err)
+		return nil, err
+	}
+	klog.Errorf("NAD type: %s", ovnCniConfig.Type)
+	if ovnCniConfig.Type == "ovn-cni" {
+		return ovnCniConfig, nil
+	}
+	return nil, fmt.Errorf("not an ovn secondary network")
 }
