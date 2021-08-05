@@ -1,50 +1,67 @@
-kind: Pod
-apiVersion: v1
+kind: Deployment
+apiVersion: apps/v1
 metadata:
   name: ovn-cni
   namespace: kube-system
-  labels:
-    name: ovn-cni-controller
-    component: network
-    type: infra
-    kubernetes.io/os: "linux"
   annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
+    kubernetes.io/description: |
+      This Deployment launches the ovn-cni controller and cni plugin for secondary interfaces.
 spec:
-  serviceAccount: kube-ovn-cni
-  hostNetwork: true
-  affinity:
-      # required to be scheduled on a linux node with node-role.kubernetes.io/master label and
-      # only one instance of ovnkube-master pod per node
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: node-role.kubernetes.io/master
-                operator: In
-                values:
-                  - ""
-              - key: kubernetes.io/os
-                operator: In
-                values:
-                  - "linux"
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - key: name
-                operator: In
-                values:
-                  - ovn-cni-controller
-          topologyKey: kubernetes.io/hostname
-  containers:
-  - name: ovn-cni
-    image: docker.io/maiqueb/k8s-ovn-cni
-    imagePullPolicy: Always
-    command: [ "/bin/sh", "-c", "--" ]
-    env:
-    - name: OVN_NORTH_IP
-      valueFrom:
-        fieldRef:
-          fieldPath: status.hostIP
-    args: [ "/usr/bin/k8s-ovn-controller --v=9 --logtostderr --ovnaddr=tcp:${OVN_NORTH_IP}:6641"]
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      name: ovn-cni-controller
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: ovn-cni-controller
+        component: network
+        type: infra
+        kubernetes.io/os: "linux"
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      serviceAccount: kube-ovn-cni
+      hostNetwork: true
+      affinity:
+        # required to be scheduled on a linux node with node-role.kubernetes.io/master label and
+        # only one instance of ovnkube-master pod per node
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: In
+                    values:
+                      - ""
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - "linux"
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: name
+                    operator: In
+                    values:
+                      - ovn-cni-controller
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: ovn-cni
+          image: docker.io/maiqueb/k8s-ovn-cni
+          imagePullPolicy: Always
+          command: [ "/bin/sh", "-c", "--" ]
+          env:
+            - name: OVN_NORTH_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          args: [ "/usr/bin/k8s-ovn-controller --v=9 --logtostderr --ovnaddr=tcp:${OVN_NORTH_IP}:6641"]
