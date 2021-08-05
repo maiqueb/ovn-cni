@@ -9,7 +9,10 @@ import (
 	"k8s.io/klog"
 )
 
-const logicalSwitchTableName = "Logical_Switch"
+const (
+	logicalSwitchTableName = "Logical_Switch"
+	ovnSecondaryNetsPrefix = "ovn_secondary_"
+)
 
 type NorthClient struct {
 	client client.Client
@@ -35,7 +38,7 @@ func NewOVNNBClient(ovnConfig config.OvnConfig) (NorthClient, error) {
 }
 
 func (nc NorthClient) CreateLogicalSwitch(name string) ([]ovsdb.Operation, error) {
-	return nc.client.Create(&LogicalSwitch{Name: name})
+	return nc.client.Create(&LogicalSwitch{Name: ovnSecondaryNetsPrefix + name})
 }
 
 func (nc NorthClient) RemoveLogicalSwitch(name string) ([]ovsdb.Operation, error) {
@@ -43,7 +46,7 @@ func (nc NorthClient) RemoveLogicalSwitch(name string) ([]ovsdb.Operation, error
 	return nc.client.Where(ls, model.Condition{
 		Field:    &ls.Name,
 		Function: ovsdb.ConditionEqual,
-		Value:    name,
+		Value:    ovnSecondaryNetsPrefix + name,
 	}).Delete()
 }
 
