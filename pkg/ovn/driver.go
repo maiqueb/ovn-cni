@@ -17,7 +17,6 @@ const (
 	logicalSwitchPortTableName    = "Logical_Switch_Port"
 	logicalSwitchConfigExcludeIPs = "exclude_ips"
 	logicalSwitchConfigSubnet     = "subnet"
-	ovnSecondaryNetsPrefix        = "ovn_secondary_"
 )
 
 type NorthClient struct {
