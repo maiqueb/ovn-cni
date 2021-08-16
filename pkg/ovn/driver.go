@@ -43,7 +43,7 @@ func NewOVNNBClient(ovnConfig config.OvnConfig) (NorthClient, error) {
 	return NorthClient{model: dbModel, client: ovnNBClient}, nil
 }
 
-func (nc NorthClient) CreateLogicalSwitch(name string, networkConfig api.OvnSecondaryNetwork) ([]ovsdb.Operation, error) {
+func (nc NorthClient) CreateLogicalSwitch(networkName string, namespace string, networkConfig api.OvnSecondaryNetwork) ([]ovsdb.Operation, error) {
 	lsConfig := map[string]string{}
 	if networkConfig.Subnet != "" {
 		lsConfig[logicalSwitchConfigSubnet] = networkConfig.Subnet
@@ -51,24 +51,24 @@ func (nc NorthClient) CreateLogicalSwitch(name string, networkConfig api.OvnSeco
 	}
 	return nc.client.Create(
 		&LogicalSwitch{
-			Name:   ovnSecondaryNetsPrefix + name,
+			Name:   GenerateOvnNetworkName(namespace, networkName),
 			Config: lsConfig,
 		})
 }
 
-func (nc NorthClient) RemoveLogicalSwitch(name string) ([]ovsdb.Operation, error) {
+func (nc NorthClient) RemoveLogicalSwitch(networkName string, namespace string) ([]ovsdb.Operation, error) {
 	ls := &LogicalSwitch{}
 	return nc.client.Where(ls, model.Condition{
 		Field:    &ls.Name,
 		Function: ovsdb.ConditionEqual,
-		Value:    ovnSecondaryNetsPrefix + name,
+		Value:    GenerateOvnNetworkName(namespace, networkName),
 	}).Delete()
 }
 
-func (nc NorthClient) CreateLogicalSwitchPort(portName string, switchName string) ([]ovsdb.Operation, error) {
+func (nc NorthClient) CreateLogicalSwitchPort(podName string, namespace string, switchName string) ([]ovsdb.Operation, error) {
 	logicalSwitchPort := &LogicalSwitchPort{
-		Name:      ovnSecondaryNetsPrefix + portName,
-		UUID:      portName,
+		Name:      GeneratePortName(namespace, podName, switchName),
+		UUID:      podName,
 		Addresses: []string{"dynamic"},
 	}
 
@@ -82,12 +82,12 @@ func (nc NorthClient) CreateLogicalSwitchPort(portName string, switchName string
 		model.Condition{
 			Field:    &logicalSwitch.Name,
 			Function: ovsdb.ConditionEqual,
-			Value:    ovnSecondaryNetsPrefix + switchName,
+			Value:    GenerateOvnNetworkName(namespace, switchName),
 		}).Mutate(logicalSwitch,
 		model.Mutation{
 			Field:   &logicalSwitch.Ports,
 			Mutator: ovsdb.MutateOperationInsert,
-			Value:   []string{portName},
+			Value:   []string{podName},
 		},
 	)
 	if err != nil {

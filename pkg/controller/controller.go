@@ -144,7 +144,7 @@ func (c *NetworkController) handleNetAttachDefAddEvent(obj interface{}) {
 		return
 	}
 
-	operations, err := c.ovnClient.CreateLogicalSwitch(nad.GetName(), *ovnNet)
+	operations, err := c.ovnClient.CreateLogicalSwitch(nad.GetName(), nad.GetNamespace(), *ovnNet)
 	if err != nil {
 		klog.Errorf("failed to generate logical switch for network: %s. Reason: %v", nad.GetName(), err)
 	}
@@ -167,7 +167,7 @@ func (c *NetworkController) handleNetAttachDefDeleteEvent(obj interface{}) {
 		return
 	}
 
-	operations, err := c.ovnClient.RemoveLogicalSwitch(nad.GetName())
+	operations, err := c.ovnClient.RemoveLogicalSwitch(nad.GetName(), nad.GetNamespace())
 	if err != nil {
 		klog.Errorf("failed to remove logical switch for network: %s. Reason: %v", nad.GetName(), err)
 	}
@@ -193,7 +193,7 @@ func (c *NetworkController) handleNewPod(obj interface{}) {
 	var operations []ovsdb.Operation
 	for _, networkName := range podSecondaryNetworks {
 		klog.Infof("going to create LSP for pod %s on network %s", pod.GetName(), networkName)
-		createLspOperations, err := c.ovnClient.CreateLogicalSwitchPort(pod.GetName(), networkName)
+		createLspOperations, err := c.ovnClient.CreateLogicalSwitchPort(pod.GetName(), pod.GetNamespace(), networkName)
 		if err != nil {
 			klog.Errorf("failed to create logical switch port for pod: %s. Reason: %v", pod.GetName(), err)
 		}
