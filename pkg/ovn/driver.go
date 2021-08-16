@@ -26,7 +26,7 @@ type NorthClient struct {
 
 func NewOVNNBClient(ovnConfig config.OvnConfig) (NorthClient, error) {
 	dbModel, err := model.NewDBModel("OVN_Northbound", map[string]model.Model{
-		logicalSwitchTableName: &LogicalSwitch{},
+		logicalSwitchTableName:     &LogicalSwitch{},
 		logicalSwitchPortTableName: &LogicalSwitchPort{},
 	})
 	if err != nil {

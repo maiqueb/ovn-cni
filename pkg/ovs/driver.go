@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	criCli = "crictl"
-	ovsBridge = "br-int"
+	criCli            = "crictl"
+	ovsBridge         = "br-int"
 	ovsCommandTimeout = 15
 	ovsVsctlCommand   = "ovs-vsctl"
 )

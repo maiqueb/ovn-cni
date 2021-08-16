@@ -186,7 +186,7 @@ func (c *NetworkController) handleNewPod(obj interface{}) {
 	}
 
 	podSecondaryNetworks, err := getPodOvnSecondaryNetworks(pod.GetAnnotations())
-	if  err != nil {
+	if err != nil {
 		return
 	}
 	klog.Infof("pod %s has networks: %v", pod.GetName(), podSecondaryNetworks)

@@ -2,7 +2,7 @@ package ovn
 
 import "fmt"
 
-const ovnSecondaryNetsPrefix        = "ovn_secondary"
+const ovnSecondaryNetsPrefix = "ovn_secondary"
 
 func GeneratePortName(namespace string, podName string, ovnNetworkName string) string {
 	return fmt.Sprintf("%s_%s_%s_%s", ovnSecondaryNetsPrefix, namespace, podName, ovnNetworkName)

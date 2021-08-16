@@ -116,7 +116,7 @@ func loadConf(bytes []byte) (*api.CNIOvnSecondaryNetwork, string, error) {
 		}
 		return &api.CNIOvnSecondaryNetwork{
 			OvnSecondaryNetwork: *n,
-			Subnet: *subnet,
+			Subnet:              *subnet,
 		}, n.CNIVersion, nil
 	}
 

@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	master     string
-	kubeconfig string
-	ovnNorth   string
-	ovsBridge  string
+	master           string
+	kubeconfig       string
+	ovnNorth         string
+	ovsBridge        string
 	ovnContainerName string
 	ovsContainerName string
 
