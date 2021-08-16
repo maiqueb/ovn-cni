@@ -44,6 +44,9 @@ $(GO):
 
 .ONESHELL:
 
+build-cni: $(GO)
+	$(GO) build -o build/ovn-cni github.com/maiqueb/ovn-cni/cmd/cni
+
 build-controller: $(GO)
 	$(GO) build -o build/k8s-ovn-controller github.com/maiqueb/ovn-cni/cmd/controller
 
@@ -56,10 +59,10 @@ vet: $(go_sources) $(GO)
 docker-build:
 	docker build -t ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
 
-docker-push:
+docker-push: docker-build
 	docker push ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
 
-docker-tag-latest:
+docker-tag-latest: docker-build
 	docker tag ${IMAGE_REGISTRY}/${IMAGE_NAME}:latest ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
 
 vendor: $(GO)
