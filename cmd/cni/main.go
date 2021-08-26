@@ -70,7 +70,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}
 
-	hostIface, contIface, err := cni.Setup(netns, args.IfName, 0, portMac, portCIDR)
+	hostIface, contIface, err := cni.Setup(netns, args.IfName, 0, portCIDR)
 	if err != nil {
 		return err
 	}

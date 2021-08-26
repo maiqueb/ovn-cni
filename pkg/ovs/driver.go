@@ -22,7 +22,7 @@ func CreatePort(hostIface *current.Interface, portName string, portMac string) e
 	ovsArgs := []string{
 		"add-port", ovsBridge, hostIface.Name,
 		"--", "set", "interface", hostIface.Name,
-		fmt.Sprintf("external_ids:attached_mac=%s", portMac),
+		//fmt.Sprintf("external_ids:attached_mac=%s", portMac),
 		fmt.Sprintf("external_ids:iface-id=%s", portName),
 	}
 	stdout, stderr, err := RunOVSVsctl(ovsArgs...)
@@ -34,17 +34,15 @@ func CreatePort(hostIface *current.Interface, portName string, portMac string) e
 	return err
 }
 
-type containerizedOvsOvnHelper struct {
+type containerizedOvsHelper struct {
 	ovsArgs string
-	ovnArgs string
 }
 
 // Exec runs various OVN and OVS utilities
 type execHelper struct {
 	exec      kexec.Interface
 	vsctlPath string
-	nbctlPath string
-	containerizedOvsOvnHelper
+	containerizedOvsHelper
 }
 
 var runner *execHelper
@@ -106,6 +104,11 @@ func run(cmdPath string, args ...string) (*bytes.Buffer, *bytes.Buffer, error) {
 func RunOVSVsctl(args ...string) (string, string, error) {
 	cmdArgs := []string{fmt.Sprintf("--timeout=%d", ovsCommandTimeout)}
 	cmdArgs = append(cmdArgs, args...)
+
+	if err := SetContainerizedExec(kexec.New(), "ovs-daemons"); err != nil {
+		return "", "", err
+	}
+
 	if runner.ovsArgs != "" {
 		cmdArgs = append(strings.Split(runner.ovsArgs, " "), cmdArgs...)
 	}

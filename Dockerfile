@@ -22,9 +22,3 @@ WORKDIR /
 LABEL io.k8s.display-name="OVN-CNI-CONTROLLER"
 
 ENTRYPOINT ["/usr/bin/k8s-ovn-controller", "--alsologtostderr"]
-
-FROM registry.access.redhat.com/ubi8/ubi-minimal
-COPY --from=builder /usr/src/k8s-ovn-cni/build/ovn-cni /usr/bin/
-WORKDIR /
-
-LABEL io.k8s.display-name="OVN-CNI"
