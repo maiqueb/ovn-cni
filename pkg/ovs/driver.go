@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	criCli            = "crictl"
+	criCli            = "/usr/local/bin/crictl"
 	ovsBridge         = "br-int"
 	ovsCommandTimeout = 15
 	ovsVsctlCommand   = "ovs-vsctl"
@@ -76,7 +76,7 @@ func SetContainerizedExec(exec kexec.Interface, ovsContainerName string) error {
 
 func composeCommandName(defaultName string, containerName string) (string, error) {
 	if containerName != "" {
-		ovnNdContainer, err := exec.Command("crictl", "ps", fmt.Sprintf("--name=%s", containerName), "-q").Output()
+		ovnNdContainer, err := exec.Command(criCli, "ps", fmt.Sprintf("--name=%s", containerName), "-q").Output()
 		if err != nil {
 			return "", fmt.Errorf("failed to understand how to contact OVN: %w", err)
 		}

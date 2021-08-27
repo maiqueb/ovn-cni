@@ -1,0 +1,78 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ovn-cni-node
+  namespace: kube-system
+  annotations:
+    kubernetes.io/description: |
+      This DaemonSet launches the ovn-cni networking components for worker nodes.
+spec:
+  selector:
+    matchLabels:
+      app: ovn-cni-node
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: ovn-cni-node
+        name: ovn-cni-node
+        component: network
+        type: infra
+        kubernetes.io/os: "linux"
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      serviceAccount: kube-ovn-cni
+      hostNetwork: true
+      hostPID: true
+      containers:
+        - name: ovn-cni
+          image: docker.io/maiqueb/ovn-cni-node
+          imagePullPolicy: "IfNotPresent"
+
+          securityContext:
+            runAsUser: 0
+            privileged: true
+
+          args: [ "--v=9" ]
+          volumeMounts:
+            - name: host-var-run-ovn-cni
+              mountPath: /var/run/ovn-cni
+            - name: host-netns
+              mountPath: /var/run/netns
+              readOnly: true
+              mountPropagation: HostToContainer
+            - name: host-crictl
+              mountPath: /usr/local/bin/crictl
+              subPath: crictl
+              mountPropagation: HostToContainer
+
+      initContainers:
+        - name: install-cni
+          command: [ "cp", "/usr/bin/ovn-cni-shim", "/host/opt/cni/bin/ovn-cni" ]
+          image: docker.io/maiqueb/ovn-cni-node
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "15Mi"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: cni
+              mountPath: /host/opt/cni/bin
+              mountPropagation: Bidirectional
+      volumes:
+        - name: cni
+          hostPath:
+            path: /opt/cni/bin
+        - name: host-var-run-ovn-cni
+          hostPath:
+            path: /var/run/ovn-cni
+        - name: host-netns
+          hostPath:
+            path: /var/run/netns
+        - name: host-crictl
+          hostPath:
+            path: /usr/local/bin

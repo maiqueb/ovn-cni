@@ -10,7 +10,6 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
-	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
 
 	"github.com/maiqueb/ovn-cni/pkg/api"
@@ -48,34 +47,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	portName := ovn.GeneratePortName(string(envArgs.K8S_POD_NAMESPACE), string(envArgs.K8S_POD_NAME), n.Name)
-	portIP, err := parsePodIP(string(envArgs.IP), &n.Subnet)
-	if err != nil {
-		return err
-	}
-	portMac := string(envArgs.MAC)
 
 	var ipConfig *current.IPConfig
 	var portCIDR *net.IPNet
-	if portIP != nil {
-		portCIDR = &net.IPNet{IP: portIP, Mask: n.Subnet.Mask}
-		ipVer := "6"
-		if portIP.To4() != nil {
-			ipVer = "4"
-		}
-		ipConfig = &current.IPConfig{
-			Version:   ipVer,
-			Interface: current.Int(1),
-			Address:   *portCIDR,
-			Gateway:   ip.NextIP(n.Subnet.IP.Mask(n.Subnet.Mask)),
-		}
-	}
 
 	hostIface, contIface, err := cni.Setup(netns, args.IfName, 0, portCIDR)
 	if err != nil {
 		return err
 	}
 
-	if err := ovs.CreatePort(hostIface, portName, portMac); err != nil {
+	if err := ovs.CreatePort(hostIface, portName, ""); err != nil {
 		return err
 	}
 
